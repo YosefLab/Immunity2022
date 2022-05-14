@@ -1,0 +1,38 @@
+rule run_de:
+    input:
+        "rnaseq/counts.txt",
+        "rnaseq/meta.txt",
+    output:
+        "de_genotype.txt",
+    script: "Scripts/run_de.R"
+
+rule run_gsea:
+    input:
+        de_results="de_genotype.txt",
+    output:
+        txt='gsea/res_table.txt',
+    script: "Scripts/gsea.py"
+
+rule make_figures:
+    input:
+        rules.run_gsea.output,
+        rules.run_de.output,
+    output:
+        "Figures/enrichments.svg",
+        "Figures/sig_scores_1vall_c9.svg",
+        "Figures/up_down_genes.svg",
+        "Figures/volcano_c9_sig.svg",
+    script: "Scripts/make_figures.py"
+
+rule make_figures2:
+    input:
+        rules.gather_rnaseq_results.output,
+        rules.run_de.output,
+    output:
+        'Figures/lpl_umap.svg',
+    script: "Scripts/plot_c9_umap_comparison.py"
+
+rule all:
+    input:
+        rules.make_figures.output,
+        rules.make_figures2.output,

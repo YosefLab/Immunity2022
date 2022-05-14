@@ -1,0 +1,7 @@
+# CD160-/- ex-vivo rna-seq
+
+Instructions:
+
+First run `snakemake all` to process data and build figures.
+
+Figure panel sources are located in the `Figures/` directory
