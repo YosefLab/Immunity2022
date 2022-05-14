@@ -1,0 +1,114 @@
+# Prerequisites
+# 
+# Individual datasets should be already unwrapped and in their respective
+# directories (see collectData script)
+
+#onsuccess:
+#    shell("snakemake all --dag 2> /dev/null | dot -Tpng -o pipeline.png")
+
+
+rule get_data:
+    message: "Gathering all data"
+    input:
+        genes="genes.tsv",
+        valid_barcodes="../combined_all_scvi/valid_barcodes.txt",
+    output:
+        scaled="data/expression_scaled.feather",
+        ens="data/expression_counts.feather",
+        meta="data/meta.txt.gz",
+        qc="data/qc.txt.gz",
+        genes="data/genes.tsv",
+    script: "collectData.py"
+
+rule SCVI:
+    message: "Running scVI"
+    input:
+        exp=rules.get_data.output.ens,
+        meta=rules.get_data.output.meta,
+    params:
+        has_batch=False,
+        filterType='Fano',
+        filterParam1=10,
+        filterParam2=1.5,
+        components=10,
+        zinb=False
+    output:
+        model="scvi/model.pkl",
+        model_genes="scvi/model_genes.txt",
+        latent="scvi/latent.txt.gz",
+        batch_encoding="scvi/batch_encoding.txt",
+    script: "combined_scripts/scvi/scviTorch.py"
+
+rule TSNE:
+    message: "Computing TSNE"
+    input:
+        latent=rules.SCVI.output.latent,
+    output:
+        out="tsne/tsne.txt",
+    script: "combined_scripts/tsne/tsne_multicore.py"
+
+rule UMAP:
+    message: "Computing UMAP"
+    input:
+        latent=rules.SCVI.output.latent,
+    params:
+        n_neighbors=30,
+    output:
+        out="umap/umap.txt",
+        out3="umap/umap3.txt",
+    script: "combined_scripts/umap/umap.py"
+
+rule cluster_together:
+    message: "Clustering combined samples"
+    input:
+        exp=rules.get_data.output.scaled,
+        meta=rules.get_data.output.meta,
+        latent=rules.SCVI.output.latent,
+        tsne=rules.UMAP.output.out,
+    output:
+        cluster_colors="cluster_together/cluster_colors.json",
+        cluster_plot="cluster_together/clusters.png",
+        clusters=protected("cluster_together/clusters.txt"),
+    params:
+        n_neighbors=30,
+        resolution=0.9,
+    script: "combined_scripts/cluster_together/clustering.py"
+
+rule cluster_de_1vAll_edger:
+    message: "Running DE 1 vs. All (Edger)"
+    input:
+        exp=rules.get_data.output.ens,
+        clusters=rules.cluster_together.output.clusters,
+        gene_symbols=rules.get_data.output.genes,
+    output:
+        out="cluster_together/cluster_de_1vAll_edgeR/cluster_de_results.txt.gz",
+        out_xlsx="cluster_together/cluster_de_1vAll_edgeR/cluster_de_results.xlsx",
+    script: "combined_scripts/cluster_together/cluster_de_1vAll/cluster_de_1vAll_edgeR.R"
+
+rule cluster_de_genotype_edger:
+    message: "Running within-cluster DE Genotype (Edger)"
+    input:
+        exp=rules.get_data.output.ens,
+        clusters=rules.cluster_together.output.clusters,
+        gene_symbols=rules.get_data.output.genes,
+        meta=rules.get_data.output.meta,
+    output:
+        out="cluster_together/cluster_de_genotype_edgeR/cluster_de_results.txt.gz",
+        out_xlsx="cluster_together/cluster_de_genotype_edgeR/cluster_de_results.xlsx",
+    script: "combined_scripts/cluster_together/cluster_de/cluster_de_edgeR.R"
+
+rule de_all_edger:
+    message: "Running DE Across Genotypes (Edger)"
+    input:
+        exp=rules.get_data.output.ens,
+        clusters=rules.cluster_together.output.clusters,
+        gene_symbols=rules.get_data.output.genes,
+        meta=rules.get_data.output.meta,
+    output:
+        out="de_all/de_results_edger.txt.gz",
+        out_xlsx="de_all/de_results_edger.xlsx",
+    script: "combined_scripts/de_all/cluster_de_edgeR.R"
+
+rule all:
+    input:
+        rules.de_all_edger.output,
