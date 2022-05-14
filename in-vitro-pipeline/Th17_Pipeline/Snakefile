@@ -1,0 +1,157 @@
+subworkflow parent:
+    workdir: ".."
+
+rule filter_data:
+    message: "Filtering data"
+    input:
+        tpm=parent("data/tpm.txt.gz"),
+        counts=parent("data/counts.txt.gz"),
+        qc=parent("data/qc.txt.gz"),
+        meta=parent("data/meta.txt.gz"),
+    params:
+        stimulus="1+6+23"
+    output:
+        tpm="data_filtered/tpm.txt.gz",
+        tpm_all="data_filtered/tpm_all.txt.gz",
+        counts="data_filtered/counts.txt.gz",
+        qc="data_filtered/qc.txt.gz",
+        meta="data_filtered/meta.txt.gz",
+    script: "../scripts/filterData.py"
+
+rule get_pubmed_counts:
+    input:
+        tpm=rules.filter_data.output.tpm,
+    output:
+        out="pubmed_results.txt"
+    script: "../scripts/gene_annotator.py"
+
+rule qpcs:
+    message: "Computing Quality PCs"
+    input:
+        qc="data_filtered/qc.txt.gz",
+    output:
+        qc="data_filtered/qc_pcs.txt.gz",
+    script: "../scripts/qpc.py"
+
+rule cc_cov:
+    message: "Computing cell-cycle covariates"
+    input:
+        tpm=rules.filter_data.output.tpm,
+    output:
+        cc="cell_cycle/cc_components.txt.gz"
+    script: "../scripts/cellCycle.py"
+
+rule normalize_noqpc:
+    message: "Normalizing data..."
+    input:
+        tpm=rules.filter_data.output.tpm,
+        qc=rules.qpcs.output.qc,
+        otherMeta=rules.cc_cov.output.cc,
+    params:
+        regressVars=["NGenesDetected", "CC1", "CC2"],
+    output:
+        tpm="normalized_noqpc/tpm.txt.gz",
+    script: "../scripts/normalize.py"
+
+rule pca:
+    input:
+        exp=rules.normalize_noqpc.output.tpm,
+    output:
+        out="pca/pca.txt.gz"
+    script: "../scripts/pca.py"
+
+rule tsne:
+    input:
+        latent=rules.pca.output.out,
+    output:
+        out="tsne/tsne.txt"
+    script: "../scripts/tsne.py"
+
+rule cluster:
+    input:
+        latent=rules.pca.output.out,
+        tsne=rules.tsne.output.out,
+    params:
+        n_neighbors=10,
+        resolution=1,
+    output:
+        cluster_colors="clusters/colors.json",
+        cluster_plot="clusters/clusters.png",
+        clusters="clusters/clusters.txt",
+    script: "../scripts/clustering.py"
+
+
+rule DE_Th17_ctrl_noqc:
+    message: "Running DE on Th17 samples - Geno ctrl"
+    input:
+        tpm=rules.filter_data.output.tpm,
+        qc=rules.qpcs.output.qc,
+        meta=rules.filter_data.output.meta,
+        otherMeta=rules.cc_cov.output.cc,
+    params:
+        filterVar="Stimulus",
+        filterLevel="1+6+23",
+        filterVar2="Genotype",
+        filterLevel2="ctrl",
+        formula="~GFP + NGenesDetected + CC1 + CC2",
+    output:
+        out="DE_Th17_ctrl_noqc/results.txt.gz",
+        out_xlsx="DE_Th17_ctrl_noqc/results.xlsx",
+    script: "../scripts/mast.R"
+
+
+rule DE_Th17_KO_noqc:
+    message: "Running DE on Th17 samples - Geno KO"
+    input:
+        tpm=rules.filter_data.output.tpm,
+        qc=rules.qpcs.output.qc,
+        meta=rules.filter_data.output.meta,
+        otherMeta=rules.cc_cov.output.cc,
+    params:
+        filterVar="Stimulus",
+        filterLevel="1+6+23",
+        filterVar2="Genotype",
+        filterLevel2="KO",
+        formula="~GFP + NGenesDetected + CC1 + CC2",
+    output:
+        out="DE_Th17_KO_noqc/results.txt.gz",
+        out_xlsx="DE_Th17_KO_noqc/results.xlsx",
+    script: "../scripts/mast.R"
+
+
+rule Th17_full_noqpc_relevel:
+    input:
+        tpm=rules.filter_data.output.tpm,
+        qc=rules.qpcs.output.qc,
+        meta=rules.filter_data.output.meta,
+        otherMeta=rules.cc_cov.output.cc,
+    params:
+        filterVar = "Stimulus",
+        filterLevel = "1+6+23",
+        formula = "~Genotype + GFP + Genotype:GFP + NGenesDetected + CC1 + CC2",
+    output:
+        out = "DE_Th17_full2_noqpc_relevel/out.txt.gz",
+        out_xlsx="DE_Th17_full2_noqpc_relevel/results.xlsx",
+    script: "../scripts/mast_full_relevel.R"
+
+rule gather_gene_sets_relevel:
+    input:
+        input=rules.Th17_full_noqpc_relevel.output.out,
+    output:
+        out="gene_sets_relevel.gmt",
+    script: "../scripts/gather_gene_sets_relevel.py"
+
+rule all:
+    input:
+        rules.filter_data.output,
+        rules.get_pubmed_counts.output,
+        rules.qpcs.output,
+        rules.cc_cov.output,
+        rules.normalize_noqpc.output,
+        rules.pca.output,
+        rules.tsne.output,
+        rules.cluster.output,
+        rules.DE_Th17_ctrl_noqc.output,
+        rules.DE_Th17_KO_noqc.output,
+        rules.Th17_full_noqpc_relevel.output,
+        rules.gather_gene_sets_relevel.output,

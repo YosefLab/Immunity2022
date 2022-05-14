@@ -1,0 +1,8 @@
+rule get_data:
+    message: "Collecting data from both experiments"
+    output:
+        tpm="data/tpm.txt.gz",
+        counts="data/counts.txt.gz",
+        qc="data/qc.txt.gz",
+        meta="data/meta.txt.gz",
+    script: "scripts/getData.py"

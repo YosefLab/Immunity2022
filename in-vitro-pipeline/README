@@ -1,0 +1,19 @@
+Prerequisites:
+
+Four files stored in <this_directory>/data
+
+    - tpm.txt.gz: genes x cells TPM table
+    - counts.txt.gz: genes x cells counts table
+    - qc.txt.gz: cells x variable table of QC stats (e.g., Align%, N_Reads, etc)
+    - meta.txt.gz: cells x variable table of experimental meta-data.  Columns are:
+        - GFP: eGFP_pos or eGFP_neg
+        - Stimulus: 12+21+23 or 1+6+23
+        - Genotype: ctrl or KO
+
+
+For each subdirectory, Th1_Pipeline and Th17_Pipeline, cd into the directory and run `snakemake all`
+
+This performs processing but doesn't generate all figures.  To generate figure panels,
+navigate Th1_Pipeline/scripts and run the python scripts from that directory. To generate the heatmaps
+navigate to Figures/ and run plot_heatmaps.py
+
