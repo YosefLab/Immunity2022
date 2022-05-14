@@ -46,16 +46,6 @@ rule lpl_tf_encode:
         results_xlsx="lpl_tf_encode.xlsx"
     script: "combined_scripts/enrich/hypergeom_thresh.py"
 
-rule lpl_tf_encode_random:
-    input:
-        gene_lists="random_bias_sets.gmt",
-        enrichment_sets="../../Signatures/Enrichr/ENCODE_TF_ChIP-seq_2015.txt",
-        background="../../10x2/combined_Colon_LPL_main_old/data/expression_scaled.feather",
-    output:
-        results="lpl_tf_encode_bias.txt",
-        results_xlsx="lpl_tf_encode_bias.xlsx"
-    script: "combined_scripts/enrich/hypergeom_thresh.py"
-
 rule iel_tf_encode:
     input:
         gene_lists=rules.gather_genesets_iel.output.out,

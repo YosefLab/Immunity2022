@@ -12,8 +12,6 @@ out_dir <- dirname(out_file)
 dir.create(out_dir, showWarnings = FALSE)
 
 sigs <- c(
-    paste0(REPO_BASE, "/Signatures/Yoseflab/signatures_NY_private.gmt"),
-    paste0(REPO_BASE, "/Signatures/Yoseflab/netPath.gmt"),
     paste0(REPO_BASE, "/Signatures/Yoseflab/misc.gmt"),
     paste0(REPO_BASE, "/Signatures/Yoseflab/exhaustion.gmt"),
     paste0(REPO_BASE, "/Signatures/MSIGDB/H_Hallmark.gmt"),
