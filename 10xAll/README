@@ -1,31 +1,46 @@
-# Directory Listing
+# Steps to run analysis
 
-- individual: parsing/analysis of individual samples
-
-- combined_all_scvi: Combine all with scvi.  Batch is Sample
-    - Initial set of clustering for filtering out contaminant cells
-    - This is where 'valid_barcodes' are derived from
-
-- combined_all_main: Rerun of scVI on only the valid cells
-    - Source of most of the analysis in Figure 2
-
-- combined_*_main:  These directories combine with scvi and filter valid barcodes. Run on subsets of data
-    - combined_SI_LPL_main
-    - combined_Spleen_main
-    - combined_Colon_IEL_main
-    - combined_Colon_LPL_main
-
-- combined_LPL: Colon + SI LPL.  Normalize Sample.
-    We defined clusters based on this for downstream LPL anlaysis
-
-Other directories for specific analyses
-    - Gather_IL23r
-    - Targets
-
-# Prerequisites
 ## Setting up individual 10x lane data
+
 Each subdirectory of individual represents a single 10x lane run.
 First cellranger 2.0.2 was run to quantify expression/cell for each run on raw fastqs.
 Then, a sym-link called `data` should be created in each subdirectory and should point to
 the `outs` directory produced by cellranger.
 Then, run `snakemake all` in each subdirectory of individual.
+
+## Initial clustering of all cells to filter out non-donor CD4 cells
+
+Navigate to combined_all_scvi and run `snakemake all`
+
+## Processing of all cells after filtering
+
+Navigate to combined_all_main and run `snakemake all`
+
+## Processing of Colonic IEL cells CD4 T cells
+
+Navigate to combined_Colon_IEL_main and run `snakemake all`
+
+## Processing of Splenic CD4 T cells
+
+Navigate to combined_Spleen_main and run `snakemake all`
+
+## Processing of SI LPL CD4 T cells
+
+Navigate to combined_SI_LPL_main and run `snakemake all`
+
+## Processing of Colonic LPL CD4 T cells
+
+Navigate to combined_Colon_LPL_main and run `snakemake all`
+
+## Processing of combined Colon and SI LPL CD4 T cells
+
+Navigate to combined_LPL and run `snakemake all`
+
+## Target prioritization
+
+After all other processing code has been run, navigate to Targets and run `snakemake all`
+
+# Figures
+
+After all processing code as been run, the python scripts in Figures can be run (run each
+within its own directory) to generate relevant figure panels
