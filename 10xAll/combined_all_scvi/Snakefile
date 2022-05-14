@@ -1,0 +1,59 @@
+# Prerequisites
+# 
+# Individual datasets should be already unwrapped and in their respective
+# directories (see collectData script)
+
+rule get_data:
+    message: "Gathering all data"
+    input:
+        genes="genes.tsv",
+    output:
+        scaled="data/expression_scaled.feather",
+        ens="data/expression_counts.feather",
+        meta="data/meta.txt.gz",
+        qc="data/qc.txt.gz",
+        genes="data/genes.tsv",
+    script: "collectData.py"
+
+rule SCVI:
+    message: "Running scVI"
+    input:
+        exp=rules.get_data.output.ens,
+        meta=rules.get_data.output.meta,
+    output:
+        model_genes="scvi/model_genes.txt",
+        latent="scvi/latent.txt.gz",
+    script: "combined_scripts/scvi/run_scvi.py"
+
+rule TSNE:
+    message: "Computing TSNE"
+    input:
+        latent=rules.SCVI.output.latent,
+    output:
+        out="tsne/tsne.txt",
+    script: "combined_scripts/tsne/tsne_multicore.py"
+
+rule cluster_together:
+    message: "Clustering combined samples"
+    input:
+        exp=rules.get_data.output.scaled,
+        meta=rules.get_data.output.meta,
+        latent=rules.SCVI.output.latent,
+        tsne=rules.TSNE.output.out,
+    output:
+        cluster_colors="cluster_together/cluster_colors.json",
+        cluster_plot="cluster_together/clusters.png",
+        clusters=protected("cluster_together/clusters.txt"),
+    script: "combined_scripts/cluster_together/clustering.py"
+
+rule List_Valid_Barcodes:
+    message: "Producing a list of valid barcodes to use for downstream analysis..."
+    input:
+        clusters=rules.cluster_together.output.clusters,
+    output:
+        "valid_barcodes.txt"
+    script: "list_valid_barcodes.py"
+
+rule all:
+    input:
+        rules.List_Valid_Barcodes.output,

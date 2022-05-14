@@ -1,0 +1,134 @@
+##################################
+#        In-vitro TF Enrich
+##################################
+
+rule in_vitro_tf_chea:
+    input:
+        gene_lists="../../in-vitro-pipeline/Th1_Pipeline/gene_sets_relevel.gmt",
+        enrichment_sets="../../Signatures/Enrichr/ChEA_2016.txt",
+        background="../../in-vitro-pipeline/Th1_Pipeline/data_filtered/tpm.txt.gz",
+    output:
+        results="in_vitro_tf_chea.txt",
+        results_xlsx="in_vitro_tf_chea.xlsx"
+    script: "combined_scripts/enrich/hypergeom_thresh.py"
+        
+rule in_vitro_tf_encode:
+    input:
+        gene_lists="../../in-vitro-pipeline/Th1_Pipeline/gene_sets_relevel.gmt",
+        enrichment_sets="../../Signatures/Enrichr/ENCODE_TF_ChIP-seq_2015.txt",
+        background="../../in-vitro-pipeline/Th1_Pipeline/data_filtered/tpm.txt.gz",
+    output:
+        results="in_vitro_tf_encode.txt",
+        results_xlsx="in_vitro_tf_encode.xlsx"
+    script: "combined_scripts/enrich/hypergeom_thresh.py"
+
+##################################
+#        In-vivo TF Enrich
+##################################
+
+rule gather_genesets_lpl:
+    output:
+        out="lpl_genesets.gmt"
+    script: "gather_genesets_lpl.py"
+
+rule gather_genesets_iel:
+    output:
+        out="iel_genesets.gmt"
+    script: "gather_genesets_iel.py"
+
+rule lpl_tf_encode:
+    input:
+        gene_lists=rules.gather_genesets_lpl.output.out,
+        enrichment_sets="../../Signatures/Enrichr/ENCODE_TF_ChIP-seq_2015.txt",
+        background="../../10x2/combined_Colon_LPL_main_old/data/expression_scaled.feather",
+    output:
+        results="lpl_tf_encode.txt",
+        results_xlsx="lpl_tf_encode.xlsx"
+    script: "combined_scripts/enrich/hypergeom_thresh.py"
+
+rule lpl_tf_encode_random:
+    input:
+        gene_lists="random_bias_sets.gmt",
+        enrichment_sets="../../Signatures/Enrichr/ENCODE_TF_ChIP-seq_2015.txt",
+        background="../../10x2/combined_Colon_LPL_main_old/data/expression_scaled.feather",
+    output:
+        results="lpl_tf_encode_bias.txt",
+        results_xlsx="lpl_tf_encode_bias.xlsx"
+    script: "combined_scripts/enrich/hypergeom_thresh.py"
+
+rule iel_tf_encode:
+    input:
+        gene_lists=rules.gather_genesets_iel.output.out,
+        enrichment_sets="../../Signatures/Enrichr/ENCODE_TF_ChIP-seq_2015.txt",
+        background="../../10x2/combined_Colon_IEL_main/data/expression_scaled.feather",
+    output:
+        results="iel_tf_encode.txt",
+        results_xlsx="iel_tf_encode.xlsx"
+    script: "combined_scripts/enrich/hypergeom_thresh.py"
+
+rule lpl_tf_chea:
+    input:
+        gene_lists=rules.gather_genesets_lpl.output.out,
+        enrichment_sets="../../Signatures/Enrichr/ChEA_2016.txt",
+        background="../../10x2/combined_Colon_LPL_main_old/data/expression_scaled.feather",
+    output:
+        results="lpl_tf_chea.txt",
+        results_xlsx="lpl_tf_chea.xlsx"
+    script: "combined_scripts/enrich/hypergeom_thresh.py"
+
+rule iel_tf_chea:
+    input:
+        gene_lists=rules.gather_genesets_iel.output.out,
+        enrichment_sets="../../Signatures/Enrichr/ChEA_2016.txt",
+        background="../../10x2/combined_Colon_IEL_main/data/expression_scaled.feather",
+    output:
+        results="iel_tf_chea.txt",
+        results_xlsx="iel_tf_chea.xlsx"
+    script: "combined_scripts/enrich/hypergeom_thresh.py"
+
+rule gather_tf_enrich:
+    input:
+        "lpl_tf_encode.txt",
+        "iel_tf_encode.txt",
+        "lpl_tf_chea.txt",
+        "iel_tf_chea.txt",
+        "in_vitro_tf_chea.txt",
+        "in_vitro_tf_encode.txt",
+    output:
+        out="targets_tf_pre.txt"
+    script:
+        "gather_tf.py"
+
+rule gather_tissue_de:
+    input:
+        in_de="../combined_all_main/TissueDE/tissue_de_vs_spleen.txt.gz",
+    output:
+        out="targets_tissue_pre.txt",
+    script:
+        "gather_tissue_de.py"
+    
+
+rule targets_pre:
+    output: "targets_pre.txt"
+    script: "gather.py"
+
+rule targets:
+    input:
+        df1=rules.targets_pre.output[0],
+        df2=rules.gather_tf_enrich.output.out,
+        df_de=rules.gather_tissue_de.output.out,
+    output:
+        out_excel="Targets.xlsx",
+        out_df="Targets.txt.gz"
+    script: "gather_all.py"
+
+
+rule all:
+    input:
+        rules.targets.output,
+        rules.in_vitro_tf_chea.output,
+        rules.in_vitro_tf_encode.output,
+        rules.lpl_tf_encode.output,
+        rules.iel_tf_encode.output,
+        rules.lpl_tf_chea.output,
+        rules.iel_tf_chea.output,

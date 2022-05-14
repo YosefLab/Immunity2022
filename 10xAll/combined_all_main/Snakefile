@@ -1,0 +1,74 @@
+# Prerequisites
+# 
+# Individual datasets should be already unwrapped and in their respective
+# directories (see collectData script)
+#
+rule get_data:
+    message: "Gathering all data"
+    input:
+        genes="genes.tsv",
+        valid_barcodes="../combined_all_scvi/valid_barcodes.txt",
+    output:
+        scaled="data/expression_scaled.feather",
+        ens="data/expression_counts.feather",
+        meta="data/meta.txt.gz",
+        qc="data/qc.txt.gz",
+        genes="data/genes.tsv",
+    script: "collectData.py"
+
+rule SCVI:
+    message: "Running scVI"
+    input:
+        exp=rules.get_data.output.ens,
+        meta=rules.get_data.output.meta,
+    params:
+        batch_var='Batch',
+        filterType='Fano',
+        filterParam1=10,
+        filterParam2=1,
+        components=10,
+        zinb=False
+    output:
+        model="scvi/model.pkl",
+        model_genes="scvi/model_genes.txt",
+        latent="scvi/latent.txt.gz",
+        batch_encoding="scvi/batch_encoding.txt",
+    script: "combined_scripts/scvi/scviTorch.py"
+
+rule UMAP:
+    message: "Computing UMAP"
+    input:
+        latent=rules.SCVI.output.latent,
+    params:
+        n_neighbors=30,
+    output:
+        out="umap/umap.txt",
+        out3="umap/umap3.txt",
+    script: "combined_scripts/umap/umap.py"
+
+rule Tissue_DE_vs_spleen:
+    input:
+        exp=rules.get_data.output.ens,
+        meta=rules.get_data.output.meta,
+        gene_symbols=rules.get_data.output.genes,
+    output:
+        out="TissueDE/tissue_de_vs_spleen.txt.gz",
+        out_xlsx="TissueDE/tissue_de_vs_spleen.xlsx",
+    script: "tissue_de_edger_vs_spleen.R"
+
+rule Tissue_DE2:
+    input:
+        exp=rules.get_data.output.ens,
+        meta=rules.get_data.output.meta,
+        gene_symbols=rules.get_data.output.genes,
+    output:
+        out="TissueDE/tissue_de2.txt.gz",
+        out_xlsx="TissueDE/tissue_de2.xlsx",
+        out_cpm="TissueDE/tissue_de2_cpm.txt.gz",
+    script: "tissue_de_edger2.R"
+
+rule all:
+    input:
+        rules.UMAP.output,
+        rules.Tissue_DE_vs_spleen.output,
+        rules.Tissue_DE2.output,
