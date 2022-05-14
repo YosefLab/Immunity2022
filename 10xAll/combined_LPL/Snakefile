@@ -106,6 +106,30 @@ rule de_all_edger:
         out_xlsx="de_all/de_results_edger.xlsx",
     script: "combined_scripts/de_all/cluster_de_edgeR.R"
 
+rule VISION:
+    message: "Running VISION"
+    input:
+        exp=rules.get_data.output.scaled,
+        meta=rules.get_data.output.meta,
+        tsne=rules.TSNE.output.out,
+        umap=rules.UMAP.output.out,
+        qc=rules.get_data.output.qc,
+        clusters=rules.cluster_together.output.clusters,
+        latent=rules.SCVI.output.latent,
+        proj_split=rules.UMAP_split.output.out,
+        meta_split=rules.cluster_together_split.output.clusters,
+    output:
+        out="vision/vision.rds",
+    script:"combined_scripts/fastproject/fastproject_v2.R"
+
+rule extract_sig_scores:
+    message: "Extracting sig scores from VISION"
+    input:
+        vis=rules.VISION.output.out,
+    output:
+        out="vision/sigScores.feather"
+    script: "combined_scripts/fastproject/extractSigScores.R"
+
 rule all:
     input:
         rules.get_data.output,
@@ -116,3 +140,4 @@ rule all:
         rules.cluster_de_1vAll_edger.output,
         rules.cluster_de_genotype_edger.output,
         rules.de_all_edger.output,
+        rules.extract_sig_scores.output,
