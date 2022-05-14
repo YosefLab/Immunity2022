@@ -1,0 +1,1 @@
+To build supplementary files, first run all other snakemake pipelines in the repo and then run `snakemake all` in this directory

@@ -1,0 +1,44 @@
+rule build_InVitroSupplement:
+    output:
+        xlsx='InVitroSupplement.xlsx'
+    script: 'Scripts/make_invitro_supplement.py'
+
+rule build_InVivoAllSupplement:
+    output:
+        xlsx='InVivoAllSupplement.xlsx'
+    script: 'Scripts/make_invivo_all_supplement.py'
+
+rule build_InVivoLPLSupplement:
+    output:
+        xlsx='InVivoLPLSupplement.xlsx'
+    script: 'Scripts/make_invivo_lpl_supplement.py'
+
+rule build_RankingSupplement:
+    input:
+       table_pre="../10xAll/Figures/Targets/targets_supplementary_table_pre.txt" 
+    output:
+        xlsx='RankingSupplement.xlsx'
+    script: 'Scripts/make_targets_supplement.py'
+
+rule build_CytokineDESupplement:
+    input:
+       table_pre="../10xAll/Figures/Targets/targets_supplementary_table_pre.txt" 
+    output:
+        xlsx='CytokineDESupplement.xlsx'
+    script: 'Scripts/make_cytokine_de_supplement.py'
+
+rule build_CD160KOSupplement:
+    input:
+       table_pre="../10xAll/Figures/Targets/targets_supplementary_table_pre.txt" 
+    output:
+        xlsx='CD160KOSupplement.xlsx'
+    script: 'Scripts/make_cd160_ko_supplement.py'
+
+rule all:
+    input:
+        rules.build_InVitroSupplement.output,
+        rules.build_InVivoAllSupplement.output,
+        rules.build_InVivoLPLSupplement.output,
+        rules.build_RankingSupplement.output,
+        rules.build_CytokineDESupplement.output,
+        rules.build_CD160KOSupplement.output,
