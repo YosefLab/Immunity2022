@@ -1,0 +1,241 @@
+#onsuccess:
+#    shell("snakemake all --dag 2> /dev/null | dot -Tpng -o pipeline.png")
+
+rule combine_data:
+    message: "Combining Ctrl and KO data"
+    input:
+        "data_ctrl/expression/expression_sym.txt.gz",
+        "data_ko/expression/expression_sym.txt.gz",
+        "data_ctrl/qc/qc.txt.gz",
+        "data_ko/qc/qc.txt.gz",
+        script="../combined_scripts/data/combine.py",
+    output:
+        "data/expression_scaled.txt.gz",
+        "data/expression_sym.txt.gz",
+        "data/meta.txt.gz",
+        "data/qc.txt.gz",
+    shell:
+        """
+        mkdir -p data
+        cd data
+        python ../{input.script}
+        """
+
+rule scone:
+    message: "Running Scone for normalization"
+    input:
+        "data/qc.txt.gz",
+        "data/expression_scaled.txt.gz",
+        script="../combined_scripts/scone/scone.R",
+    output:
+        "scone/scone_normalized.txt",
+    shell:
+        """
+        mkdir -p scone
+        cd scone
+        Rscript ../{input.script}
+        """
+
+rule PCA:
+    message: "Computing PCA"
+    input:
+        exp="scone/scone_normalized.txt",
+        script="../combined_scripts/pca/pca.py"
+    output:
+        "pca/PCS.txt"
+    shell:
+        """
+        mkdir -p pca
+        cd pca
+        python ../{input.script} ../{input.exp}
+        """
+
+rule TSNE:
+    message: "Computing TSNE"
+    input:
+        pca="pca/PCS.txt",
+        script="../combined_scripts/tsne/tsne.py",
+    output:
+        "tsne/tsne.txt"
+    shell:
+        """
+        mkdir -p tsne
+        cd tsne
+        python ../{input.script} ../{input.pca}
+        """
+
+rule cluster_together:
+    message: "Clustering combined samples"
+    input:
+        "data/expression_scaled.txt.gz",
+        "data/meta.txt.gz",
+        "pca/PCS.txt",
+        "tsne/tsne.txt",
+        notebook="../combined_scripts/cluster_together/clustering.ipynb",
+    output:
+        "cluster_together/cluster_colors.json",
+        "cluster_together/clusters.png",
+        "cluster_together/clusters.txt",
+    shell:
+        """
+        mkdir -p cluster_together
+        cp {input.notebook} cluster_together
+        cd cluster_together
+        jupyter nbconvert "clustering.ipynb" --to html --execute --ExecutePreprocessor.timeout=-1
+        rm clustering.ipynb
+        """
+
+rule cluster_genotype_de_together:
+    message: "Running DE across genotypes"
+    input:
+        exp="data/expression_sym.txt.gz",
+        meta="data/meta.txt.gz",
+        clusters="cluster_together/clusters.txt",
+    output:
+        out="cluster_together/cluster_de/cluster_de_results.txt.gz",
+        out_xlsx="cluster_together/cluster_de/cluster_de_results.xlsx",
+    script: "combined_scripts/cluster_together/cluster_de/cluster_de_edgeR.R"
+
+rule cluster_genotype_de_together_gsea:
+    message: "Running GSEA on cluster DEs across genotypes"
+    input:
+        de_results="cluster_together/cluster_de/cluster_de_results.txt.gz",
+    output:
+        out="cluster_together/cluster_de/gsea/gsea.xlsx",
+    script: "combined_scripts/cluster_together/cluster_de/gsea/GSEA.py"
+
+rule cluster_together_1vAll:
+    message: "DE 1vAll of combined clusters"
+    input:
+        exp="data/expression_sym.txt.gz",
+        clusters="cluster_together/clusters.txt",
+        #notebook="../combined_scripts/cluster_together/cluster_de_1vAll/cluster_heatmap.ipynb",
+    output:
+        out="cluster_together/cluster_de_1vAll/cluster_de_1vAll_Results.txt.gz",
+        out_xlsx="cluster_together/cluster_de_1vAll/cluster_de_1vAll_Results.xlsx",
+        #"cluster_together/cluster_de_1vAll/cluster_heatmap.png",
+        #"cluster_together/cluster_de_1vAll/cluster_heatmap.html"
+    script: "combined_scripts/cluster_together/cluster_de_1vAll/cluster_de_1vAll_edgeR.R"
+
+rule cluster_together_1vAll_gsea:
+    message: "GSEA of DE 1vAll of combined clusters"
+    input:
+        de_results="cluster_together/cluster_de_1vAll/cluster_de_1vAll_Results.txt.gz",
+    output:
+        out="cluster_together/cluster_de_1vAll/gsea/gsea.xlsx",
+    script: "combined_scripts/cluster_together/cluster_de_1vAll/gsea/GSEA.py"
+
+# rule cluster_together_pairs:
+#     message: "DE of pairs of combined clusters"
+#     input:
+#         "data/expression_normalized.txt.gz",
+#         "data/qc.txt.gz",
+#         "cluster_together/clusters.txt",
+#         "cluster_together/cluster_de_pairs/cluster_de_pairs.R",
+#     output:
+#         "cluster_together/cluster_de_pairs/cluster_de_pairs_Results.txt.gz",
+#         "cluster_together/cluster_de_pairs/cluster_de_pairs_Results.xlsx",
+#     shell:
+#         """
+#         cd cluster_together/cluster_de_pairs
+#         Rscript cluster_de_pairs.R
+#         """
+# 
+# rule cluster_together_pairs_gsea:
+#     message: "GSEA of DE of combined clusters pairs"
+#     input:
+#         "cluster_together/cluster_de_pairs/cluster_de_pairs_Results.txt.gz",
+#     output:
+#         "cluster_together/cluster_de_pairs/gsea/gsea.xlsx",
+#     shell:
+#         """
+#         cd cluster_together/cluster_de_pairs/gsea
+#         jupyter nbconvert "GSEA.ipynb" --to html --execute --ExecutePreprocessor.timeout=-1
+#         """
+
+rule de_all:
+    message: "Running DE across KO vs WT (all)"
+    input:
+        exp="data/expression_sym.txt.gz",
+        meta="data/meta.txt.gz",
+    output:
+        out="de_all/KO_vs_ctrl.txt",
+        out_xlsx="de_all/KO_vs_ctrl.xlsx",
+    script: "combined_scripts/de_all/cluster_de_edgeR.R"
+
+rule de_all_gsea:
+    message: "Running GSEA on DE across KO vs WT (all)"
+    input:
+        de_results="de_all/KO_vs_ctrl.txt",
+    output:
+        out="de_all/gsea/gsea.xlsx",
+    script: "combined_scripts/de_all/gsea/GSEA.py"
+
+rule Hotspot:
+    message: "Computing Hotspot"
+    input:
+        exp="data/expression_scaled.txt.gz",
+        coords="pca/PCS.txt",
+    output:
+        out="hotspot/hotspot_gi.txt.gz",
+        outp="hotspot/hotspot_gi_pval.txt.gz"
+    script:
+        "combined_scripts/hotspot/hotspot.py"
+
+# rule plot_clusters:
+#     message: "Plotting the location of some clusters on the tSNE"
+#     input:
+#         "tsne/tsne.txt"
+#         "data/meta.txt.gz",
+#         "tsne/plot_clusters.py",
+#     output:
+#         "tsne/ccl5_clusters.png",
+#         "tsne/th17_clusters.png",
+#     shell:
+#         """
+#         cd tsne
+#         python tsne.py
+#         """
+# 
+# rule simple_qc_norm:
+#     message: "Regressing out num_umi for normalization"
+#     input:
+#         "data/qc.txt.gz",
+#         "data/expression_normalized.txt.gz",
+#         "scone/simple_normalize.py",
+#     output:
+#         "scone/qc_norm.txt",
+#     shell:
+#         """
+#         cd scone
+#         python simple_normalize.py
+#         """
+
+rule fastproject:
+    message: "Running FastProject on combined data"
+    input:
+        tsne="tsne/tsne.txt",
+        meta="data/meta.txt.gz",
+        qc="data/qc.txt.gz",
+        exp="scone/scone_normalized.txt",
+        unnorm="data/expression_scaled.txt.gz",
+        clusters="cluster_together/clusters.txt",
+        latent="pca/PCS.txt",
+    output:
+        out="fastproject/fastproject.rds",
+    script:"combined_scripts/fastproject/fastproject_v2.R"
+
+rule all:
+    input:
+        rules.combine_data.output,
+        rules.cluster_together.output,
+        rules.cluster_genotype_de_together.output,
+        rules.cluster_genotype_de_together_gsea.output,
+        rules.cluster_together_1vAll.output,
+        rules.cluster_together_1vAll_gsea.output,
+        #rules.cluster_together_pairs_gsea.output,
+        rules.TSNE.output,
+        rules.de_all.output,
+        rules.de_all_gsea.output,
+        #rules.Hotspot.output,
+        rules.fastproject.output,

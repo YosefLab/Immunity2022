@@ -1,0 +1,14 @@
+*
+
+!*/
+!*.py
+!*.R
+!*.ipynb
+!*Snakefile
+!*README
+*.ipynb_checkpoints/
+*.snakemake/
+*.snakemake*
+*__pycache__/
+!GWAS/*
+!.gitignore

@@ -1,0 +1,48 @@
+rule get_data:
+    message: "Parsing 10x data output"
+    input:
+        matrix="data/filtered_gene_bc_matrices/mm10/matrix.mtx",
+        barcodes="data/filtered_gene_bc_matrices/mm10/barcodes.tsv",
+        genes="data/filtered_gene_bc_matrices/mm10/genes.tsv",
+    output:
+        ens="expression/expression_ens.txt.gz",
+        sym="expression/expression_sym.txt.gz",
+        filt="expression/expression_filtered.txt.gz",
+        scale="expression/expression_scaled.txt.gz",
+    script: "scripts/expression/getData.py"
+
+rule molecule_qc:
+    message: "Performing molecule qc"
+    input:
+        "../scripts/molecule_stats/Molecule Stats.ipynb",
+    output:
+        "molecule_stats/molecule_qc.txt",
+    shell:
+        """
+        mkdir -p molecule_stats
+        cp {input[0]:q} molecule_stats
+        cd molecule_stats
+        jupyter nbconvert "Molecule Stats.ipynb" --to html --execute --ExecutePreprocessor.timeout=-1
+        rm "Molecule Stats.ipynb"
+        """
+
+rule gather_qc:
+    message: "Gather QC Metrics"
+    input:
+        "molecule_stats/molecule_qc.txt",
+        "expression/expression_sym.txt.gz",
+        script="../scripts/qc/gather_qc.py"
+    output:
+        "qc/qc.txt.gz",
+    shell:
+        """
+        mkdir -p qc
+        cd qc
+        python ../{input.script}
+        """
+
+rule all:
+    input:
+        rules.gather_qc.output,
+        rules.molecule_qc.output,
+        rules.get_data.output,
