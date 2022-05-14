@@ -1,0 +1,40 @@
+rule run_de:
+    input:
+        "rnaseq/counts.txt",
+        "rnaseq/meta.txt",
+    output:
+        "de_anova.txt",
+        "pairwise_de.txt",
+    script: "Scripts/run_de.R"
+
+rule plot_pca:
+    input:
+        "rnaseq/meta.txt",
+        "rnaseq/tpm.txt",
+        "rnaseq/qc.txt",
+    output:
+        "Figures/cytokine_pca.svg"
+    script: "Scripts/plot_pca.py"
+
+rule plot_heatmap:
+    input:
+        "rnaseq/meta.txt",
+        "rnaseq/tpm.txt",
+        "rnaseq/qc.txt",
+        "de_anova.txt",
+    output:
+        "Figures/cytokine_heatmap.svg"
+    script: "Scripts/plot_heatmap.py"
+
+rule plot_de_counts:
+    input:
+        "pairwise_de.txt",
+    output:
+        "Figures/cytokine_de_counts.svg"
+    script: "Scripts/plot_num_de.py"
+
+rule all:
+    input:
+        rules.plot_pca.output,
+        rules.plot_heatmap.output,
+        rules.plot_de_counts.output,
